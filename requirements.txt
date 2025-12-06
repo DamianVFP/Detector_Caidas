@@ -1,0 +1,6 @@
+opencv-python
+numpy
+mediapipe
+requests
+twilio
+# (Agrega aquí otras que usemos después como smtplib viene con python)
