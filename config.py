@@ -1,0 +1,44 @@
+"""Configuración del proyecto (valores por defecto seguros).
+
+Este archivo lee variables de entorno para permitir configuraciones por
+entorno (local, docker, CI). NO se deben guardar credenciales en el repo.
+
+Usar la variable de entorno `GOOGLE_APPLICATION_CREDENTIALS` para apuntar al
+JSON de la cuenta de servicio de Firebase.
+"""
+import os
+from pathlib import Path
+from typing import Final
+
+# ============================================================================
+# FIRESTORE CONFIGURATION
+# ============================================================================
+
+# Nombre de la colección Firestore (confirmado por ti)
+FIRESTORE_COLLECTION: Final[str] = os.getenv("FIRESTORE_COLLECTION", "Prueba_Alertas")
+
+# Ruta al JSON local generado por JSONLogger (LEGACY: para compatibilidad)
+JSON_LOG_PATH: Final[str] = os.getenv("JSON_LOG_PATH", str(Path("outputs") / "events_history.json"))
+
+# Ruta al archivo de eventos (NUEVO: reemplaza JSON_LOG_PATH)
+EVENT_LOG_PATH: Final[str] = os.getenv("EVENT_LOG_PATH", str(Path("outputs") / "events_log.json"))
+
+# Intervalo en segundos para sincronizar con Firestore desde el hilo daemon
+SYNC_INTERVAL: Final[int] = int(os.getenv("SYNC_INTERVAL", "10"))
+
+# ============================================================================
+# EVENT DEDUPLICATION & FILTERING (v2.0)
+# ============================================================================
+
+# Duración mínima de caída en segundos para ser considerada evento válido
+# (evita falsos positivos por cambios transitorios)
+MIN_FALL_DURATION_SEC: Final[float] = float(os.getenv("MIN_FALL_DURATION_SEC", "0.5"))
+
+# Ventana de deduplicación: agrupa caídas dentro de este intervalo en una sola
+EVENT_DEDUP_WINDOW_SEC: Final[float] = float(os.getenv("EVENT_DEDUP_WINDOW_SEC", "2.0"))
+
+# Si está habilitado, usa EventLogger (frame-a-evento en lugar de frame-a-frame)
+USE_EVENT_LOGGER: Final[bool] = os.getenv("USE_EVENT_LOGGER", "true").lower() in ["true", "1", "yes"]
+
+# NOTA: No ponemos la ruta de credenciales aquí. Use la variable de entorno
+# GOOGLE_APPLICATION_CREDENTIALS para que firebase-admin la detecte.

@@ -1,0 +1,61 @@
+# Credenciales y secretos
+*.json
+!requirements.txt
+!package.json
+
+# Google Cloud
+GOOGLE_APPLICATION_CREDENTIALS
+
+# Archivos locales de secretos
+/secrets/
+/.secrets/
+/config/secrets/
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Entornos virtuales
+.venv/
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs y archivos temporales
+*.log
+*.tmp
+*.temp
+outputs/events_history.json
+outputs/.events_history.json.state
+.firebase_sync_state
+
+# Archivos de compilación MediaPipe / OpenCV
+*.so
+*.dylib
+*.dll
