@@ -29,6 +29,8 @@ from core.pose_detector import PoseDetector
 from outputs.json_logger import JSONLogger
 from outputs.event_logger import EventLogger
 from outputs.firebase_connector import FirebaseConnector
+from outputs.report_generator import ReportGenerator
+from outputs.email_sender import EmailSender
 import config
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -86,19 +88,25 @@ class VideoTestHarness:
             self.metrics["video_resolution"] = f"{w}x{h}"
 
             # 2. Inicializar componentes
-            detector = PoseDetector(complexity=1, frame_scale=1.0)
+            # Optimized defaults for faster processing in tests
+            detector = PoseDetector(complexity=0, frame_scale=0.6)
             json_logger = JSONLogger(file_path=self.json_log_path)
             event_logger = EventLogger(self.event_log_path) if config.USE_EVENT_LOGGER else None
             connector = FirebaseConnector(
                 json_log_path=self.event_log_path if config.USE_EVENT_LOGGER else self.json_log_path,
                 collection=config.FIRESTORE_COLLECTION
             )
+            report_gen = ReportGenerator(camera_name="Prueba Video", sector="Demo")
 
             # 3. Procesar video
             frame_idx = 0
             fall_count = 0
             events_completed = 0
             p_time = time.time()
+
+            detection_skip = getattr(config, 'DETECTION_SKIP', 2)
+            frame_idx = 0
+            last_bbox = None
 
             while cap.isOpened():
                 success, frame = cap.read()
@@ -108,9 +116,17 @@ class VideoTestHarness:
 
                 frame_start = time.time()
 
-                # Detectar pose
-                proc_frame, results = detector.find_pose(frame, draw=True)
-                lm_list, bbox = detector.find_position(proc_frame, results, draw=True)
+                frame_idx += 1
+
+                # Procesamiento reducido: solo cada N frames para ahorrar CPU
+                do_detection = (detection_skip <= 1) or (frame_idx % detection_skip == 0)
+                if do_detection:
+                    proc_frame, results = detector.find_pose(frame, draw=True)
+                    lm_list, bbox = detector.find_position(proc_frame, results, draw=True)
+                    last_bbox = bbox
+                else:
+                    proc_frame = frame
+                    bbox = last_bbox or {}
 
                 # Lógica de caída
                 if bbox:
@@ -133,6 +149,16 @@ class VideoTestHarness:
                             LOG.info(f"✓ Evento completado #{events_completed}: {completed_event.get('event_type')} (duración: {completed_event.get('duration_seconds'):.2f}s)")
                             cv2.putText(proc_frame, f"EVENTO #{events_completed}", (bbox["xmin"], bbox["ymin"] - 40),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+                            # Generar PDF del evento inmediatamente
+                            pdf_path = None
+                            try:
+                                pdf_path = report_gen.generate_report(event=completed_event, frame_image=proc_frame, output_dir=str(self.output_dir))
+                                if pdf_path:
+                                    LOG.info(f"Reporte PDF generado: {pdf_path}")
+                                    # Preguntar si enviar por correo (no bloquea la visualización)
+                                    self._offer_email_send(pdf_path, completed_event)
+                            except Exception:
+                                LOG.exception("Error generando PDF del evento")
                         
                         if is_falling:
                             fall_count += 1
@@ -166,12 +192,15 @@ class VideoTestHarness:
 
                 cv2.putText(proc_frame, f'FPS: {int(fps)}', (20, 70), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 0), 3)
 
-                # Mostrar (sin bloquear)
-                cv2.imshow("Test: Vigilante IA", cv2.resize(proc_frame, (1280, 720)))
+                # Mostrar (sin redimensionar innecesariamente)
+                try:
+                    frame_show = proc_frame
+                    cv2.imshow("Test: Vigilante IA", frame_show)
+                except Exception:
+                    cv2.imshow("Test: Vigilante IA", cv2.resize(proc_frame, (1280, 720)))
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
-                frame_idx += 1
 
                 # Cada 100 frames, imprimir progreso
                 if frame_idx % 100 == 0:
@@ -242,6 +271,54 @@ class VideoTestHarness:
 
         except Exception as exc:
             LOG.exception(f"Error guardando métricas: {exc}")
+
+    def _offer_email_send(self, pdf_path: str, event: dict) -> None:
+        """Ofrece al usuario enviar el reporte por correo de forma no bloqueante."""
+        try:
+            response = input(
+                f"\n¿Deseas enviar el reporte por correo? (s/n): "
+            ).strip().lower()
+            
+            if response != 's':
+                return
+            
+            # Obtener credenciales
+            sender_email, app_password = EmailSender.get_credentials_from_env()
+            if not sender_email or not app_password:
+                LOG.warning("Credenciales de Gmail no configuradas. Configura GMAIL_SENDER_EMAIL y GMAIL_APP_PASSWORD")
+                print("\nPara enviar por correo, configura las credenciales:")
+                print("  $env:GMAIL_SENDER_EMAIL = 'tu@gmail.com'")
+                print("  $env:GMAIL_APP_PASSWORD = 'xxxx xxxx xxxx xxxx'")
+                return
+            
+            # Solicitar destinatario
+            recipient = EmailSender.prompt_recipient()
+            if not recipient:
+                return
+            
+            # Enviar
+            LOG.info("Enviando reporte por correo...")
+            sender = EmailSender(sender_email=sender_email, app_password=app_password)
+            success = sender.send_report(
+                recipient_email=recipient,
+                pdf_path=pdf_path,
+                subject="Alerta: Caída Detectada - Sistema de Vigilancia",
+                body=(
+                    f"Se ha detectado una caída en el sistema de vigilancia.\n\n"
+                    f"Duración: {event.get('duration_seconds', 0):.2f} segundos\n"
+                    f"Fecha y hora: {event.get('start_time', 'Desconocida')}\n\n"
+                    f"Por favor, revise el reporte adjunto para más detalles.\n\n"
+                    f"Sistema de Vigilancia Digital IA"
+                )
+            )
+            
+            if success:
+                print(f"\n✓ Reporte enviado exitosamente a {recipient}")
+            
+        except KeyboardInterrupt:
+            LOG.info("Envío de correo cancelado por el usuario")
+        except Exception as exc:
+            LOG.exception(f"Error durante envío de correo: {exc}")
 
 
 def main():

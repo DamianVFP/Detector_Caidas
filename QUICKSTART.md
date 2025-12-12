@@ -200,6 +200,74 @@ Estado: ✓ EXITOSO
 ============================================================
 ```
 
+---
+
+## 🔌 CONECTAR DISPOSITIVOS EXTERNOS (IP Speaker, USB, ESP32)
+
+Esta versión incluye módulos para interactuar con dispositivos conectados a
+la máquina: `inputs/ip_speaker.py`, `inputs/usb_reader.py`, y
+`inputs/esp32_client.py`.
+
+Dependencias opcionales (instalar solo las que necesites):
+
+```powershell
+pip install pyserial paho-mqtt
+```
+
+1) IP Speaker (HTTP)
+
+- Usa `inputs.ip_speaker.IpSpeaker(host)` con la URL de tu dispositivo.
+- Funciones disponibles: `ping()`, `play_url(mp3_url)`, `set_volume(level)`.
+- Ejemplo:
+
+```python
+from inputs.ip_speaker import IpSpeaker
+spk = IpSpeaker('http://10.139.192.20:5000')
+spk.play_url('http://your-server/alert.mp3')
+```
+
+2) USB Serial Reader
+
+- Conecta un dispositivo USB-Serial (ej. Arduino) y usa `SerialReader`.
+- Lee líneas terminadas en `\n` y ejecuta tu callback por cada línea.
+- Ejemplo:
+
+```python
+from inputs.usb_reader import SerialReader
+
+def on_line(line):
+      print('USB>', line)
+
+reader = SerialReader(port='COM3', baudrate=115200)
+reader.start(on_line)
+# ... luego reader.stop() cuando termines
+```
+
+3) ESP32
+
+- Si tu ESP32 publica a un broker MQTT, usa `inputs.esp32_client.MQTTClient`.
+- Alternativamente, si el ESP32 expone un servidor TCP, usa `TcpClient`.
+- Ejemplo MQTT:
+
+```python
+from inputs.esp32_client import MQTTClient
+
+def on_msg(payload):
+      print('ESP32>', payload)
+
+mc = MQTTClient(broker='192.168.1.10', port=1883, topic='esp32/alerts')
+mc.start(on_msg)
+mc.publish('hello')
+# mc.stop()
+```
+
+Integración con el pipeline
+
+- Puedes suscribir los callbacks para que, por ejemplo, cuando el ESP32
+   envíe una alarma física, el sistema muestre una alerta en pantalla o
+   reproduzca un sonido vía `IpSpeaker`.
+- Si quieres, integro un demo en `main.py` o en un script `scripts/run_with_devices.py`.
+
 **Qué significan:**
 - **Total de frames:** Cantidad de imágenes procesadas
 - **Caídas detectadas:** Eventos donde ratio < 0.8

@@ -42,3 +42,8 @@ USE_EVENT_LOGGER: Final[bool] = os.getenv("USE_EVENT_LOGGER", "true").lower() in
 
 # NOTA: No ponemos la ruta de credenciales aquí. Use la variable de entorno
 # GOOGLE_APPLICATION_CREDENTIALS para que firebase-admin la detecte.
+
+# Fuente de video: puede ser un índice (webcam) o una URL (IP webcam e.g. http://10.0.0.2:8080/video)
+# Por defecto usamos 0 (webcam por defecto). Se puede sobrescribir con la variable
+# de entorno VIDEO_SOURCE.
+VIDEO_SOURCE: Final[str] = os.getenv("VIDEO_SOURCE", "0")

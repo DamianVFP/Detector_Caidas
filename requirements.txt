@@ -7,15 +7,24 @@ mediapipe>=0.10.0
 requests>=2.31.0
 twilio>=8.0.0
 
+# Reportes y generación de documentos PDF
+reportlab>=4.0.0
+pillow>=10.0.0
+
 # Firebase integration
 firebase-admin>=6.0.0
 google-cloud-firestore>=2.13.0
 
-# Development and testing (optional)
-# Uncomment if needed:
-# ultralytics>=8.0.0  # For YOLO integration (future)
+# Dispositivos y sensores (opcional - instalar según necesidad)
+# paho-mqtt>=1.6.0        # Para MQTT (ESP32, IoT devices)
+# pyserial>=3.5            # Para USB Serial (Arduino, sensores)
+
+# Desarrollo y testing (opcional)
+# Descomenta si necesitas:
 # pytest>=7.0.0
 # pytest-cov>=4.0.0
+# black>=23.0.0
+# flake8>=6.0.0
 
-# Note: smtplib and email are built-in Python modules
-# No need to install them via pip
+# Nota: smtplib y email son módulos built-in de Python
+# No es necesario instalarlos vía pip
